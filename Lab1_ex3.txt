@@ -1,0 +1,77 @@
+#include <QApplication>
+#include <QPushButton>
+#include <QVBoxLayout>
+#include <QWidget>
+#include <QTextEdit>
+#include <QFileDialog>
+#include <QString>
+#include <QFile>
+#include <QTextStream>
+#include <map>
+#include <iomanip>
+#include <sstream>
+
+// Function to process FASTA file
+QString processFasta(const QString &fileName) {
+    QFile file(fileName);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+        return "Error: Cannot open file";
+
+    QTextStream in(&file);
+    QString header = in.readLine(); // first line = info line
+    QString seq;
+
+    // concatenate sequence lines
+    while (!in.atEnd()) {
+        seq += in.readLine().trimmed();
+    }
+
+    std::map<char, int> freq;
+    for (QChar base : seq) {
+        freq[base.toLatin1()]++;
+    }
+
+    int total = seq.length();
+    std::ostringstream output;
+    output << "Header: " << header.toStdString() << "\n\n";
+    output << "Alphabet: ";
+    for (auto &p : freq) output << p.first << " ";
+    output << "\n\nPercentages:\n";
+
+    for (auto &p : freq) {
+        double percent = (double)p.second / total * 100;
+        output << p.first << " : " << std::fixed << std::setprecision(2)
+               << percent << "%\n";
+    }
+
+    return QString::fromStdString(output.str());
+}
+
+// Main GUI
+int main(int argc, char *argv[]) {
+    QApplication app(argc, argv);
+
+    QWidget window;
+    window.setWindowTitle("FASTA Sequence Analyzer");
+
+    QVBoxLayout *layout = new QVBoxLayout(&window);
+
+    QTextEdit *outputBox = new QTextEdit;
+    outputBox->setReadOnly(true);
+
+    QPushButton *openButton = new QPushButton("Open FASTA File");
+
+    layout->addWidget(openButton);
+    layout->addWidget(outputBox);
+
+    QObject::connect(openButton, &QPushButton::clicked, [&]() {
+        QString fileName = QFileDialog::getOpenFileName(
+            &window, "Open FASTA File", "", "FASTA Files (*.fasta *.fa)");
+        if (!fileName.isEmpty()) {
+            outputBox->setText(processFasta(fileName));
+        }
+    });
+
+    window.show();
+    return app.exec();
+}
